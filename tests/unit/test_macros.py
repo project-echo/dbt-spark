@@ -37,6 +37,11 @@ class TestSparkMacros(unittest.TestCase):
 
         self.default_context["adapter"].dispatch = dispatch
 
+        if temporary is None:
+            value = getattr(template.module, name)(relation, sql)
+        else:
+            value = getattr(template.module, name)(temporary, relation, sql)
+
         value = getattr(template.module, name)(temporary, relation, sql)
         return re.sub(r"\s\s+", " ", value)
 
@@ -208,3 +213,15 @@ class TestSparkMacros(unittest.TestCase):
             sql,
             "create table my_table using hudi partitioned by (partition_1,partition_2) clustered by (cluster_1,cluster_2) into 1 buckets location '/mnt/root/my_table' comment 'Description Test' as select 1",
         )
+
+    def test_macros_create_view_as(self):
+        template = self.__get_template("adapters.sql")
+
+        self.config["persist_docs"] = {"columns": True}
+        self.default_context["model"].columns = [{"name": "a", "description": "column a description"}]
+        sql = self.__run_macro(
+            template, "spark__create_view_as", None, "my_view", "select 1 as a, 2 as b"
+        ).strip()
+
+        self.assertEqual(sql, "create or replace view my_view (a comment 'column a description', b) as select 1 as a, 2 as b")
+
